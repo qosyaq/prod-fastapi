@@ -31,7 +31,9 @@ async def test_create_task_full(client: AsyncClient):
 
 
 async def test_create_task_invalid_status(client: AsyncClient):
-    response = await client.post("/api/v1/tasks/", json={"title": "X", "status": "unknown"})
+    response = await client.post(
+        "/api/v1/tasks/", json={"title": "X", "status": "unknown"}
+    )
     assert response.status_code == 422
 
 
@@ -79,7 +81,11 @@ async def test_update_task(client: AsyncClient):
 
 
 async def test_update_task_partial(client: AsyncClient):
-    created = (await client.post("/api/v1/tasks/", json={"title": "Task", "description": "Desc"})).json()
+    created = (
+        await client.post(
+            "/api/v1/tasks/", json={"title": "Task", "description": "Desc"}
+        )
+    ).json()
 
     response = await client.patch(
         f"/api/v1/tasks/{created['id']}",

@@ -13,6 +13,7 @@ from router import router
 configure_logging()
 log = logging.getLogger(__name__)
 
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     log.info("Application Started")

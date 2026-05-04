@@ -2,7 +2,13 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tasks.schemas import TaskCreate, TaskUpdate
-from tasks.service import create_task, delete_task, get_task_by_id, get_tasks, update_task
+from tasks.service import (
+    create_task,
+    delete_task,
+    get_task_by_id,
+    get_tasks,
+    update_task,
+)
 from tasks.constants import TaskStatus
 
 
@@ -17,7 +23,9 @@ async def test_create_task(session: AsyncSession):
 
 
 async def test_create_task_with_all_fields(session: AsyncSession):
-    data = TaskCreate(title="Full task", description="Desc", status=TaskStatus.IN_PROGRESS)
+    data = TaskCreate(
+        title="Full task", description="Desc", status=TaskStatus.IN_PROGRESS
+    )
     task = await create_task(session, data)
 
     assert task.title == "Full task"
@@ -79,7 +87,9 @@ async def test_update_task_status(session: AsyncSession):
 
 async def test_update_task_partial(session: AsyncSession):
     task = await create_task(session, TaskCreate(title="Task", description="Desc"))
-    updated = await update_task(session, task, TaskUpdate(status=TaskStatus.IN_PROGRESS))
+    updated = await update_task(
+        session, task, TaskUpdate(status=TaskStatus.IN_PROGRESS)
+    )
 
     assert updated.description == "Desc"
     assert updated.status == TaskStatus.IN_PROGRESS

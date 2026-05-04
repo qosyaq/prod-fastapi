@@ -27,7 +27,9 @@ async def create_task(session: AsyncSession, data: TaskCreate) -> TaskOrm:
     return task
 
 
-async def update_task(session: AsyncSession, task: TaskOrm, data: TaskUpdate) -> TaskOrm:
+async def update_task(
+    session: AsyncSession, task: TaskOrm, data: TaskUpdate
+) -> TaskOrm:
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(task, field, value)
     await session.commit()
