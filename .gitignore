@@ -1,0 +1,19 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# IDE
+.idea
+
+config/*
+!config/.env.example
+
+docker-compose.*.yml
+!docker-compose.example.yml

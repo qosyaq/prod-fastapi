@@ -1,0 +1,40 @@
+services:
+  app:
+    build: .
+    env_file:
+      - config/.env.example
+    ports:
+      - "8000:8000"
+    depends_on:
+      pg:
+        condition: service_healthy
+    restart: unless-stopped
+
+  pg:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: prod_fastapi
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d prod_fastapi"]
+      interval: 15s
+      timeout: 15s
+      retries: 5
+
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      pg:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
