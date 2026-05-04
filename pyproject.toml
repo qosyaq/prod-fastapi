@@ -1,0 +1,22 @@
+[project]
+name = "prod-fastapi"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.18.4",
+    "asyncpg>=0.30.0",
+    "fastapi>=0.115.0",
+    "greenlet>=3.5.0",
+    "gunicorn>=23.0.0",
+    "pydantic-settings>=2.7.0",
+    "sqlalchemy>=2.0.0",
+    "uvicorn[standard]>=0.32.0",
+]
+
+[dependency-groups]
+dev = [
+    "black>=26.3.1",
+    "httpx>=0.28.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.25.0",
+]
