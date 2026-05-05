@@ -25,8 +25,12 @@ uv run <command>            # run inside venv
 ## Common Commands
 
 ```bash
-# Lint / format
+# Format
 uv run black src/ tests/
+
+# Lint
+uv run ruff check src/ tests/
+uv run ruff check --fix src/ tests/  # auto-fix where possible
 
 # Tests
 uv run pytest                          # all
