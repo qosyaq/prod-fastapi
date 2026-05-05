@@ -1,6 +1,12 @@
 from .logger import GunicornLogger
 
 
+def _child_exit(server, worker) -> None:
+    from prometheus_client import multiprocess
+
+    multiprocess.mark_process_dead(worker.pid)
+
+
 def get_app_options(
     host: str,
     port: int,
@@ -17,4 +23,5 @@ def get_app_options(
         "accesslog": "-",
         "errorlog": "-",
         "logger_class": GunicornLogger,
+        "child_exit": _child_exit,
     }

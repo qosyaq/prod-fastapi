@@ -159,6 +159,7 @@ exec "$@"
 ```
 
 **Dockerfile pattern:**
+
 ```dockerfile
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
@@ -168,13 +169,13 @@ ENV PYTHONPATH=/app/src
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock ./
+COPY backend/pyproject.toml uv.lock ./
 RUN uv sync --no-group dev --no-install-project
 
-COPY migrations ./migrations
-COPY alembic.ini ./alembic.ini
-COPY src ./src
-COPY scripts ./scripts
+COPY backend/migrations ./migrations
+COPY backend/alembic.ini ./alembic.ini
+COPY backend/src ./src
+COPY backend/scripts ./scripts
 
 RUN uv sync --no-group dev
 RUN chmod +x scripts/entrypoint.sh
@@ -383,7 +384,7 @@ Because `prepend_sys_path = ./src` is set in `alembic.ini`, imports in `env.py` 
 ```python
 from config import settings
 from db import Base
-import tasks.models  # noqa: F401 — register all models for autogenerate
+import tasks
 ```
 
 Add a new domain's models import here every time a new module is created.
