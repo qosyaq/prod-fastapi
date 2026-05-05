@@ -334,7 +334,7 @@ class PostgresConfig(BaseModel):
     port: int = 5432
     user: str = "postgres"
     password: str = "postgres"
-    db: str = "app_db"
+    db: str = "prod_fastapi"
     echo: bool = False
     echo_pool: bool = False
     pool_size: int = 50
@@ -359,6 +359,10 @@ class Settings(BaseSettings):
         env_prefix="API__",
     )
     env: str = "development"
+    title: str = "Prod FastAPI"
+    debug: bool = False
+    description: str = "FastAPI monolith template"
+    version: str = "v0.1.0"
     run: RunConfig = RunConfig()
     logging: LogConfig = LogConfig()
     postgres: PostgresConfig = PostgresConfig()
