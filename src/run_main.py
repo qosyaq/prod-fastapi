@@ -1,6 +1,6 @@
 from config import settings
-from master import Application, get_app_options
 from main import app
+from master import Application, get_app_options
 
 
 def main() -> None:

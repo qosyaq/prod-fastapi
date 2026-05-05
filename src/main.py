@@ -1,13 +1,13 @@
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 
 from config import settings
-from logger import configure_logging
-from exceptions import register_exception_handlers
 from db import dispose
+from exceptions import register_exception_handlers
+from logger import configure_logging
 from router import router
 
 configure_logging()

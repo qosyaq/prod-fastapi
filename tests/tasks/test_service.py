@@ -1,6 +1,7 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tasks.constants import TaskStatus
 from tasks.schemas import TaskCreate, TaskUpdate
 from tasks.service import (
     create_task,
@@ -9,7 +10,6 @@ from tasks.service import (
     get_tasks,
     update_task,
 )
-from tasks.constants import TaskStatus
 
 
 async def test_create_task(session: AsyncSession):
@@ -48,8 +48,8 @@ async def test_get_tasks_returns_all(session: AsyncSession):
 
 
 async def test_get_tasks_ordered_by_id(session: AsyncSession):
-    t2 = await create_task(session, TaskCreate(title="B"))
-    t1 = await create_task(session, TaskCreate(title="A"))
+    await create_task(session, TaskCreate(title="B"))
+    await create_task(session, TaskCreate(title="A"))
 
     tasks = await get_tasks(session)
     assert tasks[0].id <= tasks[1].id
