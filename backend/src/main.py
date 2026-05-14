@@ -35,7 +35,9 @@ app = FastAPI(
 register_exception_handlers(app)
 app.add_middleware(PrometheusMiddleware, app_name=settings.observability.app_name)
 app.add_route("/metrics", metrics)
-setting_otlp(app, settings.observability.app_name, settings.observability.otlp_grpc_endpoint)
+setting_otlp(
+    app, settings.observability.app_name, settings.observability.otlp_grpc_endpoint
+)
 
 
 class EndpointFilter(logging.Filter):
