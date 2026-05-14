@@ -12,17 +12,21 @@ class RunConfig(BaseModel):
 class LogConfig(BaseModel):
     level: str = "INFO"
     fmt: str = (
-        "[%(asctime)s.%(msecs)03d] %(module)20s:%(lineno)-3d %(levelname)-8s - %(message)s"
+        "%(asctime)s %(levelname)s [%(name)s] [%(filename)s:%(lineno)d] [trace_id=%(otelTraceID)s span_id=%(otelSpanID)s resource.service.name=%(otelServiceName)s] - %(message)s"
     )
-    datefmt: str = "%Y-%m-%d %H:%M:%S"
+
+
+class ObservabilityConfig(BaseModel):
+    app_name: str = "app-main"
+    otlp_grpc_endpoint: str = "localhost:4317"
 
 
 class PostgresConfig(BaseModel):
     host: str = "localhost"
     port: int = 5432
-    user: str = "postgres"
-    password: str = "postgres"
-    db: str = "prod_fastapi"
+    user: str = "user"
+    password: str = "change_me"
+    db: str = "app"
     echo: bool = False
     echo_pool: bool = False
     pool_size: int = 50
@@ -57,6 +61,7 @@ class Settings(BaseSettings):
     version: str = "v0.1.0"
     run: RunConfig = RunConfig()
     logging: LogConfig = LogConfig()
+    observability: ObservabilityConfig = ObservabilityConfig()
     postgres: PostgresConfig = PostgresConfig()
 
 

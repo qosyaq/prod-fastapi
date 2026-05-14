@@ -1,28 +1,18 @@
 import logging
-import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from prometheus_client import CollectorRegistry, make_asgi_app, multiprocess
-from prometheus_fastapi_instrumentator import Instrumentator
 
 from config import settings
 from db import dispose
 from exceptions import register_exception_handlers
 from logger import configure_logging
+from observability_utils import PrometheusMiddleware, metrics, setting_otlp
 from router import router
 
 configure_logging()
 log = logging.getLogger(__name__)
-
-
-def _make_metrics_app():
-    if "PROMETHEUS_MULTIPROC_DIR" in os.environ:
-        registry = CollectorRegistry()
-        multiprocess.MultiProcessCollector(registry)
-        return make_asgi_app(registry=registry)
-    return make_asgi_app()
 
 
 @asynccontextmanager
@@ -43,7 +33,18 @@ app = FastAPI(
 )
 
 register_exception_handlers(app)
-Instrumentator().instrument(app)
+app.add_middleware(PrometheusMiddleware, app_name=settings.observability.app_name)
+app.add_route("/metrics", metrics)
+setting_otlp(app, settings.observability.app_name, settings.observability.otlp_grpc_endpoint)
+
+
+class EndpointFilter(logging.Filter):
+    # Uvicorn endpoint access log filter
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.getMessage().find("GET /metrics") == -1
+
+
+# Filter out /endpoint
+logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
 app.include_router(router)
-app.mount("/metrics", _make_metrics_app())
