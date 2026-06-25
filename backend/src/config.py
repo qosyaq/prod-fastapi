@@ -29,8 +29,8 @@ class PostgresConfig(BaseModel):
     db: str = "app"
     echo: bool = False
     echo_pool: bool = False
-    pool_size: int = 50
-    max_overflow: int = 10
+    pool_size: int = 15
+    max_overflow: int = 5
     naming_convention: dict = {
         "ix": "ix_%(column_0_label)s",
         "uq": "uq_%(table_name)s_%(column_0_name)s",
