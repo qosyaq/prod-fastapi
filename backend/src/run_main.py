@@ -12,6 +12,7 @@ def main() -> None:
             timeout=settings.run.timeout,
             workers=settings.run.workers,
             log_level=settings.logging.level,
+            observability_enabled=settings.observability_enabled,
         ),
     ).run()
 

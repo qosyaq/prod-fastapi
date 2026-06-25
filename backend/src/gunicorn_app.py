@@ -42,8 +42,9 @@ def get_app_options(
     timeout: int,
     workers: int,
     log_level: str,
+    observability_enabled: bool = False,
 ) -> dict:
-    return {
+    options: dict = {
         "bind": f"{host}:{port}",
         "workers": workers,
         "worker_class": "uvicorn.workers.UvicornWorker",
@@ -52,5 +53,7 @@ def get_app_options(
         "accesslog": "-",
         "errorlog": "-",
         "logger_class": GunicornLogger,
-        "child_exit": _child_exit,
     }
+    if observability_enabled:
+        options["child_exit"] = _child_exit
+    return options
