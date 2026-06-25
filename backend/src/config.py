@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from src.constants import Environment
+
 
 class RunConfig(BaseModel):
     host: str = "0.0.0.0"
@@ -11,14 +13,17 @@ class RunConfig(BaseModel):
 
 class LogConfig(BaseModel):
     level: str = "INFO"
-    fmt: str = (
+    fmt_otlp: str = (
         "%(asctime)s %(levelname)s [%(name)s] [%(filename)s:%(lineno)d] [trace_id=%(otelTraceID)s span_id=%(otelSpanID)s resource.service.name=%(otelServiceName)s] - %(message)s"
+    )
+    fmt: str = (
+        "[%(asctime)s.%(msecs)03d] %(module)20s:%(lineno)-3d %(levelname)-8s - %(message)s"
     )
 
 
 class ObservabilityConfig(BaseModel):
-    app_name: str = "app-a"
-    otlp_grpc_endpoint: str = "localhost:4317"
+    app_name: str
+    otlp_grpc_endpoint: str
 
 
 class PostgresConfig(BaseModel):
@@ -54,14 +59,19 @@ class Settings(BaseSettings):
         env_nested_delimiter="__",
         env_prefix="API__",
     )
-    env: str = "development"
+    env: Environment = Environment.development
     title: str = "Prod FastAPI"
+
+    @property
+    def observability_enabled(self) -> bool:
+        return self.env != Environment.development and self.observability is not None
+
     debug: bool = False
     description: str = "FastAPI monolith template"
     version: str = "v0.1.0"
     run: RunConfig = RunConfig()
     logging: LogConfig = LogConfig()
-    observability: ObservabilityConfig = ObservabilityConfig()
+    observability: ObservabilityConfig | None = None
     postgres: PostgresConfig = PostgresConfig()
 
 
