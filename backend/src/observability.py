@@ -8,7 +8,7 @@ from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from prometheus_client import Counter, CollectorRegistry, Gauge, Histogram
+from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 from prometheus_client import multiprocess as prometheus_multiprocess
 from prometheus_client.openmetrics.exposition import (
     CONTENT_TYPE_LATEST,
