@@ -41,7 +41,7 @@ services:
   # ── App (profile: app) ────────────────────────────────────────────────────────
   # Usage: ENV=staging docker-compose --profile app up -d
 
-  app-main:
+  app-a:
     profiles: [app]
     build: ./backend
     env_file:
