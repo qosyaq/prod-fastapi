@@ -1,7 +1,6 @@
 import logging
 
 from src.config import settings
-from src.constants import Environment
 
 _cfg = settings.logging
 
@@ -14,14 +13,10 @@ class _EndpointFilter(logging.Filter):
 
 
 def configure_logging() -> None:
-    if settings.env == Environment.development:
-        logging.basicConfig(
-            level=_cfg.level,
-            format=_cfg.fmt,
-        )
-    else:
+    if settings.observability_enabled:
         handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter(fmt=settings.logging.fmt))
-        logging.basicConfig(level=settings.logging.level, handlers=[handler])
-        if settings.observability_enabled:
-            logging.getLogger("uvicorn.access").addFilter(_EndpointFilter())
+        handler.setFormatter(logging.Formatter(fmt=_cfg.fmt_otlp))
+        logging.basicConfig(level=_cfg.level, handlers=[handler])
+        logging.getLogger("uvicorn.access").addFilter(_EndpointFilter())
+    else:
+        logging.basicConfig(level=_cfg.level, format=_cfg.fmt)
