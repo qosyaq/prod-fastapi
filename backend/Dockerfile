@@ -15,7 +15,6 @@ COPY alembic.ini ./alembic.ini
 COPY src ./src
 COPY scripts ./scripts
 
-RUN uv sync --no-group dev
 RUN chmod +x scripts/entrypoint.sh
 
 ENTRYPOINT ["scripts/entrypoint.sh"]
