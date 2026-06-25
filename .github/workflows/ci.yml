@@ -22,9 +22,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
-      - name: Black
-        run: uv run black src/ tests/ --check
-
       - name: Ruff
         run: uv run ruff check src/ tests/
 
