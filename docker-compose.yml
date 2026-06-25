@@ -38,11 +38,9 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # ── App (profile: app) ────────────────────────────────────────────────────────
-  # Usage: ENV=staging docker-compose --profile app up -d
+  # ── App ───────────────────────────────────────────────────────────────────────
 
   app-a:
-    profiles: [app]
     build: ./backend
     env_file:
       - .env.${ENV:-example}
@@ -54,18 +52,15 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
-  # ── Observability (profile: observability) ────────────────────────────────────
-  # Usage: docker-compose --profile observability up -d
+  # ── Observability ─────────────────────────────────────────────────────────────
 
   loki:
-    profiles: [observability]
     image: grafana/loki:3.5.0
     command: -config.file=/etc/loki/local-config.yaml
     ports:
       - "3100:3100"
 
   prometheus:
-    profiles: [observability]
     image: prom/prometheus:v3.3.1
     ports:
       - "9090:9090"
@@ -79,7 +74,6 @@ services:
     logging: *default-logging
 
   tempo:
-    profiles: [observability]
     image: grafana/tempo:2.7.2
     command: ["-config.file=/etc/tempo.yml", "--target=all", "--storage.trace.backend=local", "--storage.trace.local.path=/var/tempo", "--auth.enabled=false"]
     ports:
@@ -92,7 +86,6 @@ services:
     logging: *default-logging
 
   grafana:
-    profiles: [observability]
     image: grafana/grafana:12.0.0
     ports:
       - "3000:3000"
