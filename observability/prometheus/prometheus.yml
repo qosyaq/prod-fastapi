@@ -34,4 +34,4 @@ scrape_configs:
     scrape_interval: 5s
 
     static_configs:
-      - targets: [ 'app-a:8000' ]
+      - targets: [ 'host.docker.internal:8000' ]
