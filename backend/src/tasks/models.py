@@ -1,7 +1,7 @@
 from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from db import Base, IdIntPkMixin, TimestampMixin
+from src.db import Base, IdIntPkMixin, TimestampMixin
 
 from .constants import TaskStatus
 

@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db import session_getter
+from src.db import session_getter
 
 from .dependencies import get_task_or_404
 from .models import TaskOrm
