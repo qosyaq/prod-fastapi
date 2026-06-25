@@ -4,12 +4,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from config import settings
-from db import dispose
-from exceptions import register_exception_handlers
-from logger import configure_logging
-from observability_utils import PrometheusMiddleware, metrics, setting_otlp
-from router import router
+from src.config import settings
+from src.db import dispose
+from src.exceptions import register_exception_handlers
+from src.logger import configure_logging
+from src.observability_utils import PrometheusMiddleware, metrics, setting_otlp
+from src.router import router
 
 configure_logging()
 log = logging.getLogger(__name__)

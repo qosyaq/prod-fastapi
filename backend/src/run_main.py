@@ -1,6 +1,6 @@
-from config import settings
-from main import app
-from master import Application, get_app_options
+from src.config import settings
+from src.main import app
+from src.gunicorn_app import Application, get_app_options
 
 
 def main() -> None:
