@@ -49,6 +49,8 @@ services:
     depends_on:
       pg:
         condition: service_healthy
+      loki:
+        condition: service_started
     restart: unless-stopped
     logging: *default-logging
 
