@@ -10,7 +10,8 @@ from src.config import settings
 class GunicornLogger(Logger):
     def setup(self, cfg) -> None:
         super().setup(cfg)
-        fmt = logging.Formatter(fmt=settings.logging.fmt)
+        fmt_str = settings.logging.fmt_otlp if settings.observability_enabled else settings.logging.fmt
+        fmt = logging.Formatter(fmt=fmt_str)
         self._set_handler(self.access_log, cfg.accesslog, fmt)
         self._set_handler(self.error_log, cfg.errorlog, fmt)
 
