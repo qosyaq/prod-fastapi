@@ -1,9 +1,9 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tasks.constants import TaskStatus
-from tasks.schemas import TaskCreate, TaskUpdate
-from tasks.service import (
+from src.tasks.constants import TaskStatus
+from src.tasks.schemas import TaskCreate, TaskUpdate
+from src.tasks.service import (
     create_task,
     delete_task,
     get_task_by_id,
