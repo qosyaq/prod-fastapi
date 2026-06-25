@@ -1,341 +1,255 @@
 # prod-fastapi
 
-Personal reference. Covers how to run, how configs work, logging, observability, and why the folder structure is the way it is.
-
----
-
-## How docker-compose is structured
-
-Services are split into **profiles** — they don't all start by default:
-
-| Service | Profile | Always starts |
-|---|---|---|
-| `pg` | — | yes |
-| `adminer` | — | yes |
-| `app-main` | `app` | no |
-| `loki`, `prometheus`, `tempo`, `grafana` | `observability` | no |
-
-`pg` and `adminer` start with any `docker compose up`.
+Production-ready FastAPI monolith template. Personal reference for config, logging, observability, and project structure.
 
 ---
 
 ## Running
 
-### Only DB (local dev)
-
-```bash
-docker compose up -d
-```
-
-Starts `pg` on port `5432`, `adminer` on `8080`.
-
-Then run the app locally:
+### Local dev
 
 ```bash
 cd backend
 uv sync --group dev
-# create backend/config/.env with your vars (copy from .env.example as reference)
+# create backend/config/.env (see .env.example for reference)
 uv run python src/run_main.py
 ```
 
-### App in Docker (staging)
-
-The `app-main` service reads `env_file: .env.${ENV:-example}`. Pass `ENV` to select which file to load from the project root:
+Postgres and other infra can be started separately:
 
 ```bash
-ENV=staging docker compose --profile app up -d
+docker compose up pg adminer -d
 ```
 
-This loads `.env.staging` and passes all vars to the container. To rebuild the image:
+### Full stack in Docker
 
 ```bash
-ENV=staging docker compose --profile app up -d --build
+ENV=staging docker compose up -d
+ENV=staging docker compose up -d --build   # rebuild app image
 ```
 
-### Full stack with observability
+`app-a` reads `env_file: .env.${ENV:-example}` from project root. All services start together.
 
-```bash
-ENV=staging docker compose --profile app --profile observability up -d
-```
-
-- App: `http://localhost:8000`
-- Grafana: `http://localhost:3000`
-- Prometheus: `http://localhost:9090`
-- Adminer: `http://localhost:8080`
-
-### Useful commands
-
-```bash
-# Logs
-docker compose logs -f app-main
-
-# Open psql
-docker compose exec pg psql -U user -d app
-
-# Rebuild only app
-ENV=staging docker compose --profile app up -d --build app-main
-```
-
----
-
-## How configuration works
-
-### Pattern: Pydantic BaseSettings + nested `__` delimiter
-
-All settings in `backend/src/config.py`. One root `Settings` class with nested models:
-
-```
-Settings
-├── env                          # "development" | "staging" | "production"
-├── title, debug, description, version
-├── run: RunConfig               # host, port, workers, timeout
-├── logging: LogConfig           # level, fmt
-├── observability: ObsConfig     # app_name, otlp_grpc_endpoint
-└── postgres: PostgresConfig     # host, port, user, password, db, pool settings
-```
-
-### Env var naming
-
-Prefix `API__`, nested levels separated by `__`:
-
-```bash
-API__ENV=staging
-API__RUN__WORKERS=4
-API__LOGGING__LEVEL=DEBUG
-API__POSTGRES__HOST=pg
-API__POSTGRES__ECHO=true        # logs every SQL query
-API__POSTGRES__ECHO_POOL=true   # logs pool events
-```
-
-### Where config files are loaded from
-
-`config.py` defines:
-```python
-env_file=["config/.env", "config/.env.development"]
-```
-
-This path is **relative to the working directory** (`backend/`). In Docker, no `.env` files are copied into the image — config comes entirely from environment variables passed via `env_file` in docker-compose. Locally, create `backend/config/.env` manually (use `.env.example` at the project root as a reference for what keys exist).
-
-Priority (highest wins): environment variables → `config/.env.development` → `config/.env` → defaults in code.
-
-### Why Pydantic Settings
-
-Validation at startup — a typo in an env var crashes immediately with a clear error instead of silently using a wrong value at runtime. Nested models keep related config grouped.
-
----
-
-## How logging works
-
-Setup in `backend/src/logger.py` — called once at startup from `main.py`:
-
-```python
-def configure_logging() -> None:
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter(fmt=settings.logging.fmt))
-    logging.basicConfig(level=settings.logging.level, handlers=[handler])
-```
-
-Single `StreamHandler` → stdout. Container infra (Docker, Loki driver) handles the rest.
-
-### Log format
-
-```
-2026-05-14 12:00:00 INFO [tasks.service] [service.py:42]
-[trace_id=abc123 span_id=def456 resource.service.name=app-main] - Created task id=1
-```
-
-`trace_id` and `span_id` are injected automatically by `LoggingInstrumentor` from OpenTelemetry. Every log line is correlated to a trace — this is what makes Grafana's logs→traces drill-down work.
-
-### Access log filtering
-
-`/metrics` is scraped by Prometheus every 5s — would spam access logs. Filtered out in `main.py`:
-
-```python
-class EndpointFilter(logging.Filter):
-    def filter(self, record):
-        return record.getMessage().find("GET /metrics") == -1
-
-logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
-```
-
-### Gunicorn log integration
-
-`backend/src/master/logger.py` has a custom `GunicornLogger` that reuses the same formatter as the app — so gunicorn access logs and app logs look identical.
-
-### Log levels
-
-- `INFO` — default, production-safe
-- `DEBUG` — set `API__LOGGING__LEVEL=DEBUG` + `API__POSTGRES__ECHO=true` for full SQL query logging
+| Service    | URL                     |
+|------------|-------------------------|
+| App        | http://localhost:8000   |
+| Grafana    | http://localhost:3000   |
+| Prometheus | http://localhost:9090   |
+| Adminer    | http://localhost:8080   |
 
 ---
 
 ## How the app starts
 
-### Entry point
-
 ```
 entrypoint.sh
-  → clean stale Prometheus multiprocess files
+  → clean $PROMETHEUS_MULTIPROC_DIR
   → uv run alembic upgrade head
   → uv run python src/run_main.py
-        → Application(app, options).run()   # gunicorn BaseApplication
-             → gunicorn forks N workers
-                  → each worker runs uvicorn (UvicornWorker)
-                       → serves FastAPI app
+        → gunicorn with UvicornWorker
+             → N workers, each runs FastAPI app
+                  → lifespan: log start → serve → dispose engine on shutdown
 ```
 
-### Gunicorn wrapper (`backend/src/master/`)
-
-`master/` is a thin wrapper around gunicorn's `BaseApplication`. It exists so `main.py` stays clean (just FastAPI app definition) and the launch logic is separate. Three files:
-
-- `application.py` — `Application(BaseApplication)`: takes FastAPI app + options dict, passes to gunicorn
-- `app_options.py` — `get_app_options()`: builds the options dict from settings; also has `_child_exit` hook to clean up Prometheus multiprocess files when a worker exits
-- `logger.py` — `GunicornLogger`: gunicorn's logger subclass, uses the same format as the app
-
-### Why gunicorn + UvicornWorker
-
-Gunicorn handles worker management (process lifecycle, graceful restarts, SIGTERM handling). Uvicorn handles the actual async serving. Together: production-grade process management + async FastAPI support.
+Gunicorn config lives in `gunicorn_app.py`: worker class, timeout, logger, and a `_child_exit` hook that marks a dead worker's Prometheus files as inactive.
 
 ---
 
-## Observability stack
+## Configuration
+
+All settings in `src/config.py`. One root `Settings` with nested models:
 
 ```
-App → Prometheus  (metrics, scraped every 5s)
-App → Tempo       (traces via OTLP gRPC)
-App → Loki        (logs via Docker loki logging driver)
-All → Grafana     (dashboards, exemplar correlation between all three)
+Settings                          prefix: API__
+├── env                           API__ENV=staging
+├── title, debug, version         API__DEBUG=true
+├── run: RunConfig
+│   ├── host                      API__RUN__HOST=0.0.0.0
+│   ├── port                      API__RUN__PORT=8000
+│   ├── workers                   API__RUN__WORKERS=4
+│   └── timeout                   API__RUN__TIMEOUT=30
+├── logging: LogConfig
+│   ├── level                     API__LOGGING__LEVEL=DEBUG
+│   ├── fmt                       # plain format (dev)
+│   └── fmt_otlp                  # format with trace_id/span_id (staging+)
+├── observability: ObservabilityConfig | None
+│   ├── app_name                  API__OBSERVABILITY__APP_NAME=app-a
+│   └── otlp_grpc_endpoint        API__OBSERVABILITY__OTLP_GRPC_ENDPOINT=tempo:4317
+└── postgres: PostgresConfig
+    ├── host, port, user, password, db
+    ├── echo                      API__POSTGRES__ECHO=true    # log all SQL
+    ├── echo_pool                 API__POSTGRES__ECHO_POOL=true
+    ├── pool_size                 # 15 (default)
+    └── max_overflow              # 5  (default)
 ```
 
-### Metrics (Prometheus)
+**Priority:** env vars → `config/.env.development` → `config/.env` → code defaults.
 
-`PrometheusMiddleware` in `observability_utils.py` instruments every request:
+In Docker, no `.env` files are copied — config comes entirely from `env_file` in docker-compose.
 
-- `fastapi_requests_total` — counter, labels: method, path, app_name
-- `fastapi_responses_total` — counter, labels: method, path, status_code, app_name
-- `fastapi_requests_duration_seconds` — histogram (includes TraceID as exemplar)
-- `fastapi_requests_in_progress` — gauge
-- `fastapi_exceptions_total` — counter by exception type
-
-Endpoint: `GET /metrics`.
-
-Multiple gunicorn workers → Prometheus multiprocess mode. Each worker writes metrics to files in `$PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc`. `entrypoint.sh` cleans this dir on startup to avoid stale data from previous runs. `_child_exit` in `app_options.py` marks a worker's files as dead when it exits.
-
-### Traces (Tempo)
-
-`setting_otlp()` in `observability_utils.py` sets up:
-- `FastAPIInstrumentor` — span per HTTP request
-- `SQLAlchemyInstrumentor` — child spans for every DB query
-- `LoggingInstrumentor` — injects trace_id/span_id into log records
-
-Spans are exported to Tempo via gRPC at `API__OBSERVABILITY__OTLP_GRPC_ENDPOINT` (default: `localhost:4317`, staging: `tempo:4317`).
-
-The histogram records TraceID as an exemplar — in Grafana you can click a latency spike and jump directly to the specific trace.
-
-### Logs (Loki)
-
-Docker Compose uses `driver: loki` for app/prometheus/tempo/grafana containers. Loki parses the timestamp from log lines via regex. Grafana's Loki datasource has a derived field that extracts `trace_id` from log text and links to Tempo.
-
-### Grafana
-
-Three datasources provisioned automatically from `observability/grafana/datasource.yml`:
-
-| Datasource | Internal URL |
-|---|---|
-| Prometheus (default) | `prometheus:9090` |
-| Tempo | `tempo:3200` |
-| Loki | `loki:3100` |
-
-Dashboard loaded from `observability/dashboards/fastapi-observability.json`.
-
-**Drill-down flow:** metric spike → click exemplar → Tempo trace → click `trace_id` field → Loki logs for that exact request.
+`settings.observability_enabled` is `True` when `env != development` and `observability` is set. Controls whether OTel and Prometheus are activated.
 
 ---
 
-## Database & migrations
+## Logging
 
-### SQLAlchemy async
+Configured once at startup by `configure_logging()` in `logger.py`.
 
-`backend/src/db/session.py` — async engine via `asyncpg`. Pool defaults: 50 connections, 10 overflow.
+**Dev format:**
+```
+[2026-05-14 12:00:00,123]          tasks.service:42  INFO     - Task created
+```
 
-### Base model with naming convention
+**Staging/prod format (OTel injected):**
+```
+2026-05-14 12:00:00 INFO [src.tasks.service] [service.py:42] [trace_id=abc span_id=def resource.service.name=app-a] - Task created
+```
 
-`backend/src/db/base.py` — `DeclarativeBase` with explicit `naming_convention`. Ensures Alembic generates deterministic constraint names (e.g. `fk_tasks_user_id_users`) instead of Postgres auto-names. Matters when you need to drop/rename constraints in future migrations.
+`trace_id` and `span_id` are injected automatically by `LoggingInstrumentor`. Every log line is correlated to a trace — this is what enables Grafana's Loki → Tempo drill-down.
 
-### Mixins (`backend/src/db/mixins.py`)
+`GET /metrics` access logs are suppressed (Prometheus scrapes it every 5s).
+
+---
+
+## Observability
+
+```
+App → /metrics endpoint     → Prometheus (scraped every 5s)
+App → OTLP gRPC (4317)      → Tempo (traces)
+App → stdout                → Docker Loki driver → Loki (logs)
+All → Grafana               (dashboards + correlation)
+```
+
+Everything is set up in one call from `main.py`:
+
+```python
+if settings.observability_enabled:
+    setup_observability(app)
+```
+
+**Metrics** — `PrometheusMiddleware` tracks per-request:
+
+| Metric | Type |
+|--------|------|
+| `fastapi_requests_total` | Counter |
+| `fastapi_responses_total` | Counter |
+| `fastapi_requests_duration_seconds` | Histogram |
+| `fastapi_requests_in_progress` | Gauge |
+| `fastapi_exceptions_total` | Counter |
+
+The histogram includes a `TraceID` exemplar on each observation — clicking a spike in Grafana jumps directly to that trace in Tempo.
+
+Multiple gunicorn workers → Prometheus multiprocess mode via `$PROMETHEUS_MULTIPROC_DIR`.
+
+**Traces** — three instrumentors:
+
+- `FastAPIInstrumentor` — one span per HTTP request
+- `SQLAlchemyInstrumentor` — child spans per SQL query (engine passed explicitly so spans are captured correctly)
+- `LoggingInstrumentor` — injects `trace_id`/`span_id` into every log record
+
+**Drill-down flow:** Grafana metric spike → click exemplar → Tempo trace (full span tree with SQL queries) → click `trace_id` → Loki logs for that exact request.
+
+Grafana datasources and dashboards are provisioned automatically from `observability/grafana/` and `observability/dashboards/`.
+
+---
+
+## Database
+
+**Engine** (`db/session.py`): async via `asyncpg`, pool size 15 + 5 overflow.
+
+**Base** (`db/base.py`): `DeclarativeBase` with explicit `naming_convention` — constraint names like `fk_tasks_user_id_users` instead of Postgres auto-names. Matters when dropping/renaming constraints in migrations.
+
+**Mixins** (`db/mixins.py`):
 
 ```python
 class IdIntPkMixin:    # id: int primary key
-class TimestampMixin:  # created_at, updated_at with server-side defaults
+class TimestampMixin:  # created_at, updated_at (server-side defaults)
 ```
 
-Usage: `class TaskOrm(IdIntPkMixin, TimestampMixin, Base)`.
-
-### Alembic
-
-Config in `backend/alembic.ini`. Migration files named by date:
-```
-2026_05_04_2120-ca6d219b0627_create_tasks_table.py
-```
-
-Common commands (run from `backend/`):
+**Migrations:** Alembic with async engine. File naming: `YYYY_MM_DD_HHMM-<rev>_<slug>.py`. Post-write hook runs `ruff` on each new file. Migrations run automatically on container start via `entrypoint.sh`.
 
 ```bash
-# Generate migration from model changes
+# from backend/
 uv run alembic revision --autogenerate -m "add_users_table"
-
-# Apply all pending
 uv run alembic upgrade head
-
-# Rollback one step
 uv run alembic downgrade -1
-
-# Check current revision
 uv run alembic current
 ```
 
-Migrations run automatically on container start via `entrypoint.sh`.
+---
+
+## Domain modules
+
+Each domain follows a fixed structure — you always know where things live:
+
+```
+tasks/
+├── constants.py     # TaskStatus enum
+├── models.py        # TaskOrm (SQLAlchemy)
+├── schemas.py       # TaskCreate, TaskUpdate, TaskResponse (Pydantic)
+├── service.py       # Business logic (async, takes AsyncSession)
+├── router.py        # FastAPI APIRouter — HTTP only, calls service
+├── dependencies.py  # get_task_or_404 shared dependency
+└── exceptions.py    # TaskNotFound HTTPException
+```
+
+Adding a new domain means replicating this structure under `src/<domain>/`.
 
 ---
 
-## Folder architecture
+## Testing
+
+Tests use transactional isolation: each test runs in a transaction that is rolled back after the test — no cleanup needed, no shared state.
+
+```python
+# conftest.py — key idea
+async with engine.connect() as conn:
+    await conn.begin()
+    async with AsyncSession(bind=conn, join_transaction_mode="create_savepoint") as sess:
+        yield sess
+    await conn.rollback()   # ← always rolled back
+```
+
+`client` fixture overrides `session_getter` to use the test session, so HTTP tests hit the same transaction.
+
+```bash
+uv run pytest
+uv run pytest -v tests/tasks/
+```
+
+---
+
+## Folder structure
 
 ```
 prod-fastapi/
 ├── backend/
-│   ├── src/                        # All Python source (PYTHONPATH=/app/src in Docker)
-│   │   ├── main.py                 # FastAPI app + lifespan hooks
-│   │   ├── run_main.py             # Entry point: builds gunicorn options, calls .run()
-│   │   ├── config.py               # All settings (one import: from config import settings)
-│   │   ├── logger.py               # configure_logging(), called once at startup
-│   │   ├── router.py               # Mounts domain routers under /api/v1
-│   │   ├── exceptions.py           # Global exception handlers
-│   │   ├── observability_utils.py  # PrometheusMiddleware + OpenTelemetry init
-│   │   ├── db/                     # Engine, sessionmaker, DeclarativeBase, mixins
-│   │   ├── master/                 # Gunicorn Application wrapper + options + logger
-│   │   └── tasks/                  # Domain module
-│   ├── migrations/                 # Alembic (separate from src)
+│   ├── src/
+│   │   ├── main.py            # FastAPI app, lifespan, middleware
+│   │   ├── run_main.py        # Entry point → gunicorn
+│   │   ├── config.py          # All settings (one import: from src.config import settings)
+│   │   ├── logger.py          # configure_logging()
+│   │   ├── gunicorn_app.py    # GunicornLogger + get_app_options()
+│   │   ├── observability.py   # PrometheusMiddleware + setup_observability()
+│   │   ├── router.py          # Mounts domain routers under /api/v1
+│   │   ├── exceptions.py      # Global exception handlers
+│   │   ├── constants.py       # Environment enum
+│   │   ├── db/                # Engine, session, Base, mixins
+│   │   └── tasks/             # Domain module
+│   ├── migrations/            # Alembic (env.py + versions/)
 │   ├── scripts/entrypoint.sh
-│   └── tests/
-├── observability/                  # Prometheus, Tempo, Loki, Grafana configs
+│   ├── tests/
+│   ├── Dockerfile
+│   └── pyproject.toml
+├── observability/
+│   ├── prometheus/prometheus.yml
+│   ├── tempo/tempo.yml
+│   ├── grafana/datasource.yml
+│   └── dashboards/
 └── docker-compose.yml
 ```
 
-### Why `src/` layout
-
-Without `src/`, Python adds the project root to `sys.path` and you risk accidentally importing a local file instead of an installed package (name collision). With `src/`:
-
-- Docker sets `PYTHONPATH=/app/src` → `from config import settings` works everywhere
-- `pyproject.toml` sets `pythonpath = ["src"]` → same for tests
-- No path manipulation, no `sys.path` hacks
-
-### Why domain modules
-
-Each domain has a fixed structure: `router.py`, `service.py`, `models.py`, `schemas.py`, `dependencies.py`, `exceptions.py`, `constants.py`. Adding a new domain (e.g. `users/`) means replicating this structure. You always know where things live without reading the code. Router only does HTTP, service only does business logic.
-
-### Why `master/` is separate
-
-Gunicorn is infrastructure, not application code. Keeping the launch logic in `master/` means `main.py` is pure FastAPI (app definition, middleware, routes) and `run_main.py` is just the entry point. Swapping gunicorn for something else → touch only `master/` and `run_main.py`.
+`src/` layout prevents name collisions with installed packages. `PYTHONPATH=/app` in Docker, `pythonpath = ["."]` in pytest config.
 
 ---
 
@@ -344,25 +258,16 @@ Gunicorn is infrastructure, not application code. Keeping the launch logic in `m
 ```bash
 cd backend
 
-# Install all deps including dev
 uv sync --group dev
-
-# Format
-uv run black .
-
-# Lint (with autofix)
-uv run ruff check . --fix
-
-# Tests
-uv run pytest
-uv run pytest -v tests/tasks/
-
-# Run locally
 uv run python src/run_main.py
 
-# New migration
-uv run alembic revision --autogenerate -m "description"
+uv run black .
+uv run ruff check . --fix
+uv run pytest
 
-# Apply migrations
+uv run alembic revision --autogenerate -m "description"
 uv run alembic upgrade head
+
+docker compose logs -f app-a
+docker compose exec pg psql -U user -d app
 ```
