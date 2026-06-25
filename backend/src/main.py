@@ -8,7 +8,7 @@ from src.config import settings
 from src.db import dispose
 from src.exceptions import register_exception_handlers
 from src.logger import configure_logging
-from src.observability import PrometheusMiddleware, metrics, setting_otlp
+from src.observability import setup_observability
 from src.router import router
 
 configure_logging()
@@ -35,10 +35,6 @@ app = FastAPI(
 register_exception_handlers(app)
 
 if settings.observability_enabled:
-    app.add_middleware(PrometheusMiddleware, app_name=settings.observability.app_name)
-    app.add_route("/metrics", metrics)
-    setting_otlp(
-        app, settings.observability.app_name, settings.observability.otlp_grpc_endpoint
-    )
+    setup_observability(app)
 
 app.include_router(router)

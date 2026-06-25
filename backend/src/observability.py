@@ -118,23 +118,26 @@ def metrics(request: Request) -> Response:
     )
 
 
-def setting_otlp(
-    app: ASGIApp, app_name: str, endpoint: str, log_correlation: bool = True
-) -> None:
-    # Setting OpenTelemetry
-    # set the service name to show in traces
-    resource = Resource.create(attributes={"service.name": app_name})
+def setup_observability(app: ASGIApp) -> None:
+    from src.config import settings
+    from src.db.session import async_engine
 
-    # set the tracer provider
+    app_name = settings.observability.app_name
+    endpoint = settings.observability.otlp_grpc_endpoint
+
+    app.add_middleware(PrometheusMiddleware, app_name=app_name)
+    app.add_route("/metrics", metrics)
+
+    resource = Resource.create(attributes={"service.name": app_name})
     tracer = TracerProvider(resource=resource)
     trace.set_tracer_provider(tracer)
-
     tracer.add_span_processor(
         BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint, insecure=True))
     )
 
-    if log_correlation:
-        LoggingInstrumentor().instrument(set_logging_format=True)
-
+    LoggingInstrumentor().instrument(set_logging_format=True)
     FastAPIInstrumentor.instrument_app(app, tracer_provider=tracer)
-    SQLAlchemyInstrumentor().instrument(tracer_provider=tracer)
+    SQLAlchemyInstrumentor().instrument(
+        tracer_provider=tracer,
+        engine=async_engine.sync_engine,
+    )
