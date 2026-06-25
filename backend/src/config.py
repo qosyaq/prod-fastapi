@@ -17,7 +17,7 @@ class LogConfig(BaseModel):
 
 
 class ObservabilityConfig(BaseModel):
-    app_name: str = "app-main"
+    app_name: str = "app-a"
     otlp_grpc_endpoint: str = "localhost:4317"
 
 
