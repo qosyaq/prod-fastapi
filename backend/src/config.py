@@ -13,11 +13,11 @@ class RunConfig(BaseModel):
 
 class LogConfig(BaseModel):
     level: str = "INFO"
-    fmt_otlp: str = (
-        "%(asctime)s %(levelname)s [%(name)s] [%(filename)s:%(lineno)d] [trace_id=%(otelTraceID)s span_id=%(otelSpanID)s resource.service.name=%(otelServiceName)s] - %(message)s"
-    )
     fmt: str = (
         "[%(asctime)s.%(msecs)03d] %(module)20s:%(lineno)-3d %(levelname)-8s - %(message)s"
+    )
+    fmt_otlp: str = (
+        "%(asctime)s %(levelname)s [%(name)s] [%(filename)s:%(lineno)d] [trace_id=%(otelTraceID)s span_id=%(otelSpanID)s resource.service.name=%(otelServiceName)s] - %(message)s"
     )
 
 
