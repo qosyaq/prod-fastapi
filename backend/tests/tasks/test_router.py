@@ -35,11 +35,17 @@ async def test_create_task_invalid_status(client: AsyncClient):
         "/api/v1/tasks/", json={"title": "X", "status": "unknown"}
     )
     assert response.status_code == 422
+    error = response.json()["errors"][0]
+    assert error["code"] == "VALIDATION_ERROR"
+    assert error["field"] == "status"
 
 
 async def test_create_task_missing_title(client: AsyncClient):
     response = await client.post("/api/v1/tasks/", json={})
     assert response.status_code == 422
+    error = response.json()["errors"][0]
+    assert error["code"] == "VALIDATION_ERROR"
+    assert error["field"] == "title"
 
 
 async def test_list_tasks(client: AsyncClient):
@@ -64,7 +70,9 @@ async def test_get_task(client: AsyncClient):
 async def test_get_task_not_found(client: AsyncClient):
     response = await client.get("/api/v1/tasks/99999")
     assert response.status_code == 404
-    assert response.json()["detail"] == "Task not found"
+    error = response.json()["errors"][0]
+    assert error["code"] == "NOT_FOUND"
+    assert error["message"] == "Task not found"
 
 
 async def test_update_task(client: AsyncClient):
