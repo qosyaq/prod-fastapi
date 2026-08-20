@@ -68,7 +68,7 @@ class Settings(BaseSettings):
 
     debug: bool = False
     description: str = "FastAPI monolith template"
-    version: str = "v0.1.0"
+    version: str = "1.0"
     run: RunConfig = RunConfig()
     logging: LogConfig = LogConfig()
     observability: ObservabilityConfig | None = None
