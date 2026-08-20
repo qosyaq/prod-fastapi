@@ -4,26 +4,23 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import session_getter
-from src.errors import ErrorResponse
 
+from .constants import DATABASE_ERROR_RESPONSE, NOT_FOUND_RESPONSE, VALIDATION_RESPONSE
 from .dependencies import get_task_or_404
 from .models import TaskOrm
 from .schemas import TaskCreate, TaskResponse, TaskUpdate
 from .service import create_task, delete_task, get_tasks, update_task
 
-VALIDATION_RESPONSE = {422: {"model": ErrorResponse}}
-NOT_FOUND_RESPONSE = {404: {"model": ErrorResponse}}
-
 router = APIRouter(
     prefix="/tasks",
     tags=["Tasks"],
-    responses={503: {"model": ErrorResponse}},
+    responses=DATABASE_ERROR_RESPONSE,
 )
 
 
 @router.get("/", response_model=list[TaskResponse])
 async def list_tasks(
-        session: Annotated[AsyncSession, Depends(session_getter)],
+    session: Annotated[AsyncSession, Depends(session_getter)],
 ) -> list[TaskResponse]:
     tasks = await get_tasks(session)
     return [TaskResponse.model_validate(task) for task in tasks]
@@ -36,8 +33,8 @@ async def list_tasks(
     responses=VALIDATION_RESPONSE,
 )
 async def create_task_route(
-        data: TaskCreate,
-        session: Annotated[AsyncSession, Depends(session_getter)],
+    data: TaskCreate,
+    session: Annotated[AsyncSession, Depends(session_getter)],
 ) -> TaskResponse:
     task = await create_task(session, data)
     return TaskResponse.model_validate(task)
@@ -49,7 +46,7 @@ async def create_task_route(
     responses={**NOT_FOUND_RESPONSE, **VALIDATION_RESPONSE},
 )
 async def get_task_route(
-        task: Annotated[TaskOrm, Depends(get_task_or_404)],
+    task: Annotated[TaskOrm, Depends(get_task_or_404)],
 ) -> TaskResponse:
     return TaskResponse.model_validate(task)
 
@@ -60,9 +57,9 @@ async def get_task_route(
     responses={**NOT_FOUND_RESPONSE, **VALIDATION_RESPONSE},
 )
 async def update_task_route(
-        task: Annotated[TaskOrm, Depends(get_task_or_404)],
-        data: TaskUpdate,
-        session: Annotated[AsyncSession, Depends(session_getter)],
+    task: Annotated[TaskOrm, Depends(get_task_or_404)],
+    data: TaskUpdate,
+    session: Annotated[AsyncSession, Depends(session_getter)],
 ) -> TaskResponse:
     updated = await update_task(session, task, data)
     return TaskResponse.model_validate(updated)
@@ -74,7 +71,7 @@ async def update_task_route(
     responses={**NOT_FOUND_RESPONSE, **VALIDATION_RESPONSE},
 )
 async def delete_task_route(
-        task: Annotated[TaskOrm, Depends(get_task_or_404)],
-        session: Annotated[AsyncSession, Depends(session_getter)],
+    task: Annotated[TaskOrm, Depends(get_task_or_404)],
+    session: Annotated[AsyncSession, Depends(session_getter)],
 ) -> None:
     await delete_task(session, task)
