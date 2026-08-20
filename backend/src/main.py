@@ -38,3 +38,14 @@ if settings.observability_enabled:
     setup_observability(app)
 
 app.include_router(router)
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "src.main:app",
+        host=settings.run.host,
+        port=settings.run.port,
+        workers=settings.run.workers,
+        log_config=None,
+    )
