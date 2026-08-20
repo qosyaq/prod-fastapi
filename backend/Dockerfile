@@ -18,4 +18,4 @@ COPY scripts ./scripts
 RUN chmod +x scripts/entrypoint.sh
 
 ENTRYPOINT ["scripts/entrypoint.sh"]
-CMD ["uv", "run", "python", "src/run_main.py"]
+CMD ["uv", "run", "--no-sync", "python", "src/run_main.py"]

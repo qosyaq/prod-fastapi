@@ -9,7 +9,7 @@ if [ -n "$PROMETHEUS_MULTIPROC_DIR" ]; then
 fi
 
 echo "Applying migrations..."
-uv run alembic upgrade head
+uv run --no-sync alembic upgrade head
 echo "Migrations applied."
 
 exec "$@"
