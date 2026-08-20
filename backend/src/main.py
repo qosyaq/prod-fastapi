@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from src.config import settings
 from src.db import dispose
+from src.errors import ErrorResponse
 from src.exceptions import register_exception_handlers
 from src.logger import configure_logging
 from src.observability import setup_observability
@@ -30,6 +31,7 @@ app = FastAPI(
     version=settings.version,
     debug=settings.debug,
     lifespan=lifespan,
+    responses={500: {"model": ErrorResponse}},
 )
 
 register_exception_handlers(app)
